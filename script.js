@@ -9,6 +9,7 @@ const {
 const sleep = require("sleep-promise");
 const axios = require("axios");
 const { RTMClient } = require("@slack/client");
+const nodeCleanup = require("node-cleanup");
 
 const slack = new RTMClient(SLACK_TOKEN);
 slack.start();
@@ -16,8 +17,14 @@ slack.start();
 const notifyGeneral = msg =>
   slack.sendMessage(`<!channel>: ${msg}`, SLACK_CONVERSATION_ID);
 
+nodeCleanup((exitCode, signal) => {
+  notifyGeneral("Shutting down!").catch(console.error);
+});
+
 // Main loop
 async function main() {
+  await notifyGeneral("Starting up!");
+
   // Initialize baseline html file if it doesn't exist
   if (!fs.existsSync(HTML_PATH)) {
     console.log("Fetching baseline html");
@@ -29,12 +36,12 @@ async function main() {
 
   const prevHtml = fs.readFileSync(HTML_PATH, "utf-8");
 
-  while (true) {
-    await sleep(parseInt(INTERVAL, 10));
+  try {
+    while (true) {
+      await sleep(parseInt(INTERVAL, 10));
 
-    console.log("Checking...");
+      console.log("Checking...");
 
-    try {
       const { data: html } = await axios.get(URL);
 
       if (html !== prevHtml) {
@@ -45,9 +52,9 @@ async function main() {
 
         console.log("Notification sent", msg.ts);
       }
-    } catch (e) {
-      console.error(e);
     }
+  } catch (e) {
+    console.error(e);
   }
 }
 
